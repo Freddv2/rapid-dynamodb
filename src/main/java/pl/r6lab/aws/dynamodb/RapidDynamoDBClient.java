@@ -1,12 +1,12 @@
 package pl.r6lab.aws.dynamodb;
 
-import javax.xml.bind.DatatypeConverter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -118,7 +118,7 @@ public final class RapidDynamoDBClient {
         BufferedReader in = new BufferedReader(
                 new InputStreamReader(inputStream));
         String inputLine;
-        StringBuffer content = new StringBuffer();
+        StringBuilder content = new StringBuilder();
         while ((inputLine = in.readLine()) != null) {
             content.append(inputLine);
         }
@@ -153,7 +153,14 @@ public final class RapidDynamoDBClient {
     }
 
     private String hexBinary(byte[] bytes) {
-        return DatatypeConverter.printHexBinary(bytes);
+        byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes();
+        byte[] hexChars = new byte[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars, StandardCharsets.UTF_8);
     }
 
     private String canonicalHeaders(String awsDate) {
