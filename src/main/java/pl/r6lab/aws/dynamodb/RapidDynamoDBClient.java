@@ -33,32 +33,46 @@ public final class RapidDynamoDBClient {
     private static final String NEW_LINE = "\n";
     private static final String DOT = ".";
     private static final String API_VERSION = "DynamoDB_20120810";
+    private static final String HTTP = "http://";
+    private static final String HTTPS = "https://";
 
-    private final String accessKey;
-    private final String secretKey;
-    private final String sessionToken;
-    private final String region;
+    private String accessKey;
+    private String secretKey;
+    private String sessionToken;
+    private String region;
+    private String endpoint;
 
-    private RapidDynamoDBClient(String accessKey, String secretKey, String sessionToken, String region) {
+    private RapidDynamoDBClient(String accessKey, String secretKey, String sessionToken, String region, String endpoint)
+    {
         this.accessKey = accessKey;
         this.secretKey = secretKey;
         this.sessionToken = sessionToken;
         this.region = region;
+        this.endpoint = endpoint;
     }
 
-    public DynamoDBResponse execute(DynamoDBRequest request) {
+    private RapidDynamoDBClient(String accessKey, String secretKey, String sessionToken, String region, boolean https)
+    {
+        String endpoint = buildRegionEndpoint(https, region);
+        new RapidDynamoDBClient(accessKey, secretKey, sessionToken, region, endpoint);
+    }
+
+    public DynamoDBResponse execute(DynamoDBRequest request)
+    {
         LocalDateTime now = LocalDateTime.now();
         String signatureDate = now.toLocalDate().format(SIGNATURE_KEY_DATE_FORMATTER);
         String awsDate = now.format(AWS_DATE_FORMATTER);
 
-        try {
+        try
+        {
             HttpURLConnection connection = initConnection();
             byte[] signingKey = SignatureVersion4.getSignatureKey(this.secretKey, now.toLocalDate(), this.region, SERVICE);
             int contentLength = request.getPayload().getBytes().length;
             setBasicHeaders(connection, request, awsDate, contentLength);
 
             // Used for Temporary Security Credentials
-            if (this.sessionToken != null) {
+            if (this.sessionToken != null)
+            {
                 connection.setRequestProperty("x-amz-security-token", sessionToken);
             }
 
@@ -70,56 +84,75 @@ public final class RapidDynamoDBClient {
             connection.getOutputStream().write(request.getPayload().getBytes());
             connection.getOutputStream().flush();
             return handleResponse(connection);
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RapidDynamoDBClientException(e);
         }
     }
 
-    public final static RapidDynamoDBClient envAware() {
-        return new RapidDynamoDBClient(System.getenv(AWS_ACCESS_KEY_ENV_VARIABLE), System.getenv(AWS_SECRET_KEY_ENV_VARIABLE), System.getenv(AWS_SESSION_TOKEN_ENV_VARIABLE), System.getenv(AWS_REGION_ENV_VARIABLE));
-    }
-
-    public final static RapidDynamoDBClient of(String accessKey, String secretKey, String sessionToken, String region) {
-        if (isNull(accessKey) || isNull(secretKey) || isNull(region)) {
+    public static RapidDynamoDBClient of(String accessKey, String secretKey, String sessionToken, String region, boolean https)
+    {
+        if (isNull(accessKey) || isNull(secretKey) || isNull(region))
+        {
             throw new IllegalArgumentException("Missing mandatory AWS parameters");
         }
-        return new RapidDynamoDBClient(accessKey, secretKey, sessionToken, region);
+        return new RapidDynamoDBClient(accessKey, secretKey, sessionToken, region, https);
     }
 
-    private HttpURLConnection initConnection() {
-        try {
-            HttpURLConnection connection = (HttpURLConnection) new URL("https://" + host()).openConnection();
+    public static RapidDynamoDBClient envAware(boolean https)
+    {
+        return new RapidDynamoDBClient(System.getenv(AWS_ACCESS_KEY_ENV_VARIABLE), System.getenv(AWS_SECRET_KEY_ENV_VARIABLE), System.getenv(AWS_SESSION_TOKEN_ENV_VARIABLE),
+                System.getenv(AWS_REGION_ENV_VARIABLE), https);
+    }
+
+    public static RapidDynamoDBClient local(int port)
+    {
+        String endpoint = String.format("http://localhost:%d", port);
+        return new RapidDynamoDBClient("dummy-accessKey", "dummy-secretKey", "dummy-sessionToken", "dummy-region", endpoint);
+    }
+
+    private HttpURLConnection initConnection()
+    {
+        try
+        {
+            HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
             connection.setRequestMethod(HTTP_METHOD);
             connection.setDoOutput(true);
             return connection;
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             throw new RapidDynamoDBClientException(e);
         }
     }
 
-
-    private DynamoDBResponse handleResponse(HttpURLConnection connection) throws IOException {
-        if (connection.getResponseCode() == 200) {
+    private DynamoDBResponse handleResponse(HttpURLConnection connection) throws IOException
+    {
+        if (connection.getResponseCode() == 200)
+        {
             return DynamoDBResponse.success(getResponse(connection.getInputStream()));
-        } else {
+        } else
+        {
             return DynamoDBResponse.fail(getResponse(connection.getErrorStream()));
         }
     }
 
-    private void setBasicHeaders(HttpURLConnection connection, DynamoDBRequest request, String awsDate, int contentLength) {
+    private void setBasicHeaders(HttpURLConnection connection, DynamoDBRequest request, String awsDate, int contentLength)
+    {
         connection.setRequestProperty("Content-Length", Integer.toString(contentLength));
         connection.setRequestProperty("Content-Type", "application/x-amz-json-1.0");
-        connection.setRequestProperty("Host", host());
+        connection.setRequestProperty("Host", endpoint);
         connection.setRequestProperty("X-Amz-Date", awsDate);
         connection.setRequestProperty("X-Amz-Target", API_VERSION + DOT + request.getAction().getName());
     }
 
-    private String getResponse(InputStream inputStream) throws IOException {
+    private String getResponse(InputStream inputStream) throws IOException
+    {
         BufferedReader in = new BufferedReader(
                 new InputStreamReader(inputStream));
         String inputLine;
         StringBuilder content = new StringBuilder();
-        while ((inputLine = in.readLine()) != null) {
+        while ((inputLine = in.readLine()) != null)
+        {
             content.append(inputLine);
         }
         return content.toString();
@@ -148,14 +181,17 @@ public final class RapidDynamoDBClient {
         return canonicalRequest;
     }
 
-    private String signature(byte[] signingKey, String stringToSign) throws Exception {
+    private String signature(byte[] signingKey, String stringToSign) throws Exception
+    {
         return hexBinary(SignatureVersion4.hmacSHA256(stringToSign, signingKey)).toLowerCase();
     }
 
-    private String hexBinary(byte[] bytes) {
+    private String hexBinary(byte[] bytes)
+    {
         byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes();
         byte[] hexChars = new byte[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
+        for (int j = 0; j < bytes.length; j++)
+        {
             int v = bytes[j] & 0xFF;
             hexChars[j * 2] = HEX_ARRAY[v >>> 4];
             hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
@@ -163,16 +199,20 @@ public final class RapidDynamoDBClient {
         return new String(hexChars, StandardCharsets.UTF_8);
     }
 
-    private String canonicalHeaders(String awsDate) {
-        return "host:" + host() + NEW_LINE + "x-amz-date:" + awsDate;
+    private String canonicalHeaders(String awsDate)
+    {
+        return "host:" + endpoint + NEW_LINE + "x-amz-date:" + awsDate;
     }
 
-    private String credentialsScope(String signatureDate) {
+    private String credentialsScope(String signatureDate)
+    {
         return signatureDate + "/" + region + "/" + SERVICE + "/" + "aws4_request";
     }
 
-    private String host() {
-        return SERVICE + DOT + this.region + DOT + "amazonaws.com";
+    private String buildRegionEndpoint(boolean https, String region)
+    {
+        String httpUrl = https ? HTTPS : HTTP;
+        return httpUrl + SERVICE + DOT + region + DOT + "amazonaws.com";
     }
 
 }
