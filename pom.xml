@@ -8,7 +8,7 @@
     <groupId>com.github.freddv2.dynamodb</groupId>
     <artifactId>rapid-dynamodb-11</artifactId>
     <packaging>jar</packaging>
-    <version>0.0.1</version>
+    <version>1.0.0</version>
     <build>
         <plugins>
             <plugin>

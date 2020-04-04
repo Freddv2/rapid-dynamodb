@@ -1,5 +1,7 @@
 # rapid-dynamodb
-Example lightweight DynamoDB integration that limits AWS Lambda cold starts for Java. It is pure-Java8 implementation without third-part libraries that increases fat JAR size and cold starts time.
+Lightweight DynamoDB client that minimize AWS Lambda cold starts for Java. It is pure-Java11 implementation without third-part libraries that increases fat JAR size and cold starts time.
+
+The library is forked from https://github.com/rjozefowicz/rapid-dynamodb which was the jdk 8 version with small modifications.
 
 It uses DynamoDB Low-Level API described on https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Operations_Amazon_DynamoDB.html
 
@@ -26,9 +28,9 @@ Maven dependencies:
             <version>1.2.0</version>
         </dependency>
         <dependency>
-            <groupId>pl.r6lab.aws</groupId>
-            <artifactId>rapid-dynamodb</artifactId>
-            <version>0.1.0</version>
+            <groupId>com.github.freddv2.dynamodb</groupId>
+            <artifactId>rapid-dynamodb-11</artifactId>
+            <version>1.0.0</version>
         </dependency>
         <dependency>
             <groupId>javax.json</groupId>
@@ -48,7 +50,11 @@ Example AWS Lambda handler that accepts request with uuid and after successful P
 public class RapidDynamoDBLambda implements RequestHandler<Map<String, String>, String> {
 
     public String handleRequest(Map<String, String> event, Context context) {
-        RapidDynamoDBClient rapidDynamoDBClient = RapidDynamoDBClient.envAware();
+        
+RapidDynamoDBClient rapidDynamoDBClient = new RapidDynamoDBClient.RapidDynamoDBClientBuilder()
+                .fromEnvironmentVariables()
+                .withHttps(false) // Use http if possible, establishing an SSL connection takes more time
+                .build();
 
         DynamoDBRequest putItemRequest = DynamoDBRequest.of(Action.PUT_ITEM, getItemJson(event.get("uuid")));
         DynamoDBResponse response = rapidDynamoDBClient.execute(putItemRequest);

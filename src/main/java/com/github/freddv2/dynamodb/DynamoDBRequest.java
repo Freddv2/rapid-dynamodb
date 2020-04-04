@@ -18,7 +18,8 @@ public class DynamoDBRequest {
         return payload;
     }
 
-    public static final DynamoDBRequest of(Action action, String payload) {
+    public static DynamoDBRequest of(Action action, String payload)
+    {
         return new DynamoDBRequest(action, payload);
     }
 }
