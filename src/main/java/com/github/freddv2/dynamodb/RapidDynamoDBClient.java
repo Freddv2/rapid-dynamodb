@@ -42,21 +42,6 @@ public final class RapidDynamoDBClient {
     private String region;
     private String endpoint;
 
-    private RapidDynamoDBClient(String accessKey, String secretKey, String sessionToken, String region, String endpoint)
-    {
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
-        this.sessionToken = sessionToken;
-        this.region = region;
-        this.endpoint = endpoint;
-    }
-
-    private RapidDynamoDBClient(String accessKey, String secretKey, String sessionToken, String region, boolean https)
-    {
-        String endpoint = buildRegionEndpoint(https, region);
-        new RapidDynamoDBClient(accessKey, secretKey, sessionToken, region, endpoint);
-    }
-
     public DynamoDBResponse execute(DynamoDBRequest request)
     {
         LocalDateTime now = LocalDateTime.now();
@@ -88,27 +73,6 @@ public final class RapidDynamoDBClient {
         {
             throw new RapidDynamoDBClientException(e);
         }
-    }
-
-    public static RapidDynamoDBClient of(String accessKey, String secretKey, String sessionToken, String region, boolean https)
-    {
-        if (isNull(accessKey) || isNull(secretKey) || isNull(region))
-        {
-            throw new IllegalArgumentException("Missing mandatory AWS parameters");
-        }
-        return new RapidDynamoDBClient(accessKey, secretKey, sessionToken, region, https);
-    }
-
-    public static RapidDynamoDBClient envAware(boolean https)
-    {
-        return new RapidDynamoDBClient(System.getenv(AWS_ACCESS_KEY_ENV_VARIABLE), System.getenv(AWS_SECRET_KEY_ENV_VARIABLE), System.getenv(AWS_SESSION_TOKEN_ENV_VARIABLE),
-                System.getenv(AWS_REGION_ENV_VARIABLE), https);
-    }
-
-    public static RapidDynamoDBClient local(int port)
-    {
-        String endpoint = String.format("http://localhost:%d", port);
-        return new RapidDynamoDBClient("dummy-accessKey", "dummy-secretKey", "dummy-sessionToken", "dummy-region", endpoint);
     }
 
     private HttpURLConnection initConnection()
@@ -209,10 +173,94 @@ public final class RapidDynamoDBClient {
         return signatureDate + "/" + region + "/" + SERVICE + "/" + "aws4_request";
     }
 
-    private String buildRegionEndpoint(boolean https, String region)
+    public static class RapidDynamoDBClientBuilder
     {
-        String httpUrl = https ? HTTPS : HTTP;
-        return httpUrl + SERVICE + DOT + region + DOT + "amazonaws.com";
-    }
+        private String accessKey;
+        private String secretKey;
+        private String sessionToken;
+        private String region;
+        private String endpointPointOverride;
+        private boolean https = true;
 
+        public RapidDynamoDBClientBuilder fromEnvironmentVariables()
+        {
+            this.accessKey = System.getenv(AWS_ACCESS_KEY_ENV_VARIABLE);
+            this.secretKey = System.getenv(AWS_SECRET_KEY_ENV_VARIABLE);
+            this.sessionToken = System.getenv(AWS_SESSION_TOKEN_ENV_VARIABLE);
+            this.region = System.getenv(AWS_REGION_ENV_VARIABLE);
+
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder fromLocalClient(int port)
+        {
+            this.accessKey = "dummy-accessKey";
+            this.secretKey = "dummy-secretKey";
+            this.sessionToken = "dummy-sessionToken";
+            this.region = "dummy-region";
+            this.endpointPointOverride = String.format("http://localhost:%d", port);
+
+            return this;
+        }
+
+        public RapidDynamoDBClient build()
+        {
+            if (isNull(accessKey) || isNull(secretKey) || isNull(region))
+            {
+                throw new IllegalArgumentException("Missing mandatory AWS parameters");
+            }
+
+            RapidDynamoDBClient rapidDynamoDBClient = new RapidDynamoDBClient();
+
+            rapidDynamoDBClient.accessKey = accessKey;
+            rapidDynamoDBClient.secretKey = secretKey;
+            rapidDynamoDBClient.sessionToken = sessionToken;
+            rapidDynamoDBClient.region = region;
+            rapidDynamoDBClient.endpoint = isNull(endpointPointOverride) ? buildEndpoint(https, region) : endpointPointOverride;
+
+            return rapidDynamoDBClient;
+        }
+
+        public RapidDynamoDBClientBuilder withAccessKey(String accessKey)
+        {
+            this.accessKey = accessKey;
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder withSecretKey(String secretKey)
+        {
+            this.secretKey = secretKey;
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder withSessionToken(String sessionToken)
+        {
+            this.sessionToken = sessionToken;
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder withRegion(String region)
+        {
+            this.region = region;
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder withEndpointOverride(String endpoint)
+        {
+            this.endpointPointOverride = endpoint;
+            return this;
+        }
+
+        public RapidDynamoDBClientBuilder withHttps(boolean https)
+        {
+            this.https = https;
+            return this;
+        }
+
+        private String buildEndpoint(boolean https, String region)
+        {
+            String httpUrl = https ? HTTPS : HTTP;
+            return httpUrl + SERVICE + DOT + region + DOT + "amazonaws.com";
+        }
+    }
 }
