@@ -1,4 +1,4 @@
-package pl.r6lab.aws.dynamodb;
+package com.github.freddv2.dynamodb;
 
 import java.io.BufferedReader;
 import java.io.IOException;

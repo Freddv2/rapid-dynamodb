@@ -1,19 +1,22 @@
-package pl.r6lab.aws.dynamodb;
+package com.github.freddv2.dynamodb;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-public final class SignatureVersion4 {
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+public final class SignatureVersion4
+{
 
     private static final String HMAC_ALGORITHM = "hmacSHA256";
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("YYYYMMdd");
 
-    public static final byte[] sha256(String toEncode) throws NoSuchAlgorithmException {
+    public static final byte[] sha256(String toEncode) throws NoSuchAlgorithmException
+    {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         return digest.digest(
                 toEncode.getBytes(StandardCharsets.UTF_8));
